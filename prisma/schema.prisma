@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  users     User[]
+  requests  IpRequest[]
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id             String @id @default(uuid())
+  name           String
+  email          String @unique
+  password       String
+  role           Role
+  organizationId String
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  requests       IpRequest[]
+  approvedLogs   WorkflowLog[]
+
+  // ✅ ADDED: The missing relation back to the Session model
+  sessions       Session[]
+
+  entityMappings EntityControllerMapping[]
+
+  createdAt      DateTime @default(now())
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique // The opaque string sent in the cookie
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  csrfToken    String   // Unique token required for state-changing requests
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  
+  // Track device/IP for audit and anomaly detection
+  userAgent    String?
+  ipAddress    String?
+}
+
+// Ensure your existing AuditLog table supports Auth events
+enum AuditCategory {
+  WORKFLOW
+  AUTH
+  ADMIN_CHANGE
+  DATA_EXPORT
+}
+
+model IpRequest {
+  id              String   @id @default(uuid())
+
+  userId          String
+  organizationId  String
+
+  ips             IpRequestIP[]
+  category        RequestCategory
+  status          RequestStatus
+
+  entityName      String
+  username        String
+  location        String?
+  contactPerson   String?
+  email           String?
+  phone           String?
+
+  currentRole     Role
+  submittedByRole Role
+
+  ticketNo        String @unique
+
+  reason          String?
+  remarks         String?
+
+  // NEW FIELDS FOR EMERGENCY HANDLING
+  isEmergency     Boolean @default(false)
+  duration        String?
+
+  isApiAccess     Boolean @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User @relation(fields: [userId], references: [id])
+  organization    Organization @relation(fields: [organizationId], references: [id])
+
+  logs            WorkflowLog[]
+  whitelist       IpWhitelist[]
+  ipToRemove      String?
+  initiatorRegion String?  
+}
+
+model IpWhitelist {
+  id        String   @id @default(uuid())
+
+  userId    String
+  ipAddress String
+  active    Boolean  @default(true)
+
+  requestId String?
+
+  createdAt DateTime @default(now())
+
+  request   IpRequest? @relation(fields: [requestId], references: [id])
+}
+
+model WorkflowLog {
+  id           String   @id @default(uuid())
+
+  requestId    String
+  stage        WorkflowStage
+  action       WorkflowAction?
+  role         Role?
+
+  approvedById String?
+  approvedBy   User? @relation(fields: [approvedById], references: [id])
+  remarks      String?
+
+  createdAt    DateTime @default(now())
+
+  request      IpRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model IpRequestIP {
+  id        String   @id @default(uuid())
+
+  requestId String
+  ipAddress String
+
+  createdAt DateTime @default(now())
+
+  request   IpRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model Entity {
+  id                 String   @id @default(uuid())
+  name               String   @unique
+  region             String?  // NEW: Store SRLDC, NRLDC, etc.
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  beneficiaryUsers   BeneficiaryUser[]
+  controllerMappings EntityControllerMapping[]
+}
+
+model BeneficiaryUser {
+  id            String   @id @default(uuid())
+
+  entityId      String
+  username      String   @unique
+  contactPerson String?
+  email         String?
+  phone         String?
+  location      String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  entity        Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  activeIps     BeneficiaryUserIP[]
+
+  @@index([entityId])
+}
+
+model BeneficiaryUserIP {
+  id                String   @id @default(uuid())
+
+  beneficiaryUserId String
+  ipAddress         String
+  active            Boolean  @default(true)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  beneficiaryUser   BeneficiaryUser @relation(fields: [beneficiaryUserId], references: [id], onDelete: Cascade)
+
+  @@index([beneficiaryUserId])
+}
+
+model EntityControllerMapping {
+  id           String   @id @default(uuid())
+
+  entityId     String
+  controllerId String
+
+  createdAt DateTime @default(now())
+
+  entity       Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  controller   User   @relation(fields: [controllerId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId, controllerId])
+  @@index([controllerId])
+}
+
+enum Role {
+  USER
+  RLDC
+  NLDC
+  CISO
+  SOC
+  IT
+  ADMIN
+}
+
+enum RequestCategory {
+  NEW_USER
+  EXISTING_USER
+
+}
+
+enum RequestStatus {
+  CREATED
+  UNDER_NLDC_REVIEW
+
+  SENT_TO_CISO
+  CISO_APPROVED
+
+  SENT_TO_SOC
+  SOC_VERIFIED
+
+  SENT_TO_IT
+  WHITELISTED
+
+  COMPLETED
+
+  NEED_MORE_INFO
+  REJECTED
+}
+
+enum WorkflowStage {
+  NLDC
+  CISO
+  SOC
+  IT
+}
+
+enum WorkflowAction {
+  APPROVED
+  REJECTED
+  SENT_BACK
+  FORWARDED
+}

@@ -1,0 +1,32 @@
+{
+  "id": "world-map",
+  "name": "world",
+  "viewBox": "0 0 800 400",
+  "layers": [
+    {
+      "id": "usa",
+      "name": "USA",
+      "d": "M170,90 L220,90 L220,150 L170,150 Z"
+    },
+    {
+      "id": "can",
+      "name": "Canada",
+      "d": "M170,40 L220,40 L220,89 L170,89 Z"
+    },
+    {
+      "id": "eur",
+      "name": "Europe",
+      "d": "M400,90 L450,90 L450,150 L400,150 Z"
+    },
+    {
+      "id": "aus",
+      "name": "Australia",
+      "d": "M650,250 L700,250 L700,300 L650,300 Z"
+    },
+    {
+      "id": "ind",
+      "name": "India",
+      "d": "M550,150 L600,150 L600,200 L550,200 Z"
+    }
+  ]
+}

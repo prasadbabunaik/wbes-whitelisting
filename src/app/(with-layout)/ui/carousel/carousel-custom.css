@@ -1,0 +1,32 @@
+/* Custom Carousel Styles */
+.carousel .slide img,
+.carousel .slide .d-block {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+.carousel .carousel-status {
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.9);
+}
+
+.carousel .carousel-dark .control-arrow {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.carousel .control-dots .dot {
+  box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.carousel .legend {
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.5);
+  opacity: 0.8;
+  text-align: center;
+  padding: 10px;
+}
+
+.carousel .legend h5 {
+  margin-bottom: 0;
+  color: white;
+}

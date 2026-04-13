@@ -1,0 +1,58 @@
+"use client";
+import React from "react";
+import { Button, Card, CardBody, Col, Container, Row } from "reactstrap";
+import Image from "next/image";
+
+const Offlinepage = () => {
+  document.title =
+    "Offline Page | Velzon - Next.js TypeScript Admin & Dashboard Template";
+
+  const refresh = () => {
+    window.location.reload();
+  };
+
+  return (
+    <React.Fragment>
+      <div className="auth-page-wrapper auth-bg-cover py-5 d-flex justify-content-center align-items-center min-vh-100">
+        <div className="bg-overlay"></div>
+        <div className="auth-page-content overflow-hidden pt-lg-5">
+          <Container>
+            <Row className="justify-content-center">
+              <Col xl={5}>
+                <Card className="overflow-hidden card-bg-fill">
+                  <CardBody className="p-4">
+                    <div className="text-center">
+                      <Image
+                        src="https://img.themesbrand.com/velzon/images/auth-offline.gif"
+                        alt=""
+                        width={245}
+                        height={210}
+                      />
+                      <h3 className="mt-4 fw-semibold">
+                        We&apos;re currently offline
+                      </h3>
+                      <p className="text-muted mb-4 fs-14">
+                        We can&apos;t show you this images because you
+                        aren&apos;t connected to the internet. When you&apos;re
+                        back online refresh the page or hit the button below
+                      </p>
+                      <Button
+                        color="success"
+                        className="btn-border"
+                        onClick={refresh}
+                      >
+                        <i className="ri-refresh-line align-bottom"></i> Refresh
+                      </Button>
+                    </div>
+                  </CardBody>
+                </Card>
+              </Col>
+            </Row>
+          </Container>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+};
+
+export default Offlinepage;
