@@ -21,6 +21,8 @@ import LightDark from "@common/LightDark";
 import { changeSidebarVisibility } from "@slices/thunks";
 import { useSelector, useDispatch } from "react-redux";
 import { createSelector } from "reselect";
+import SessionTimer from "@common/SessionTimer";
+import NotificationsDropdown from "@common/NotificationsDropdown";
 
 const Header = ({ onChangeLayoutMode, layoutModeType, headerClass }: any) => {
   const dispatch: any = useDispatch();
@@ -181,6 +183,12 @@ const Header = ({ onChangeLayoutMode, layoutModeType, headerClass }: any) => {
 
               {/* NotificationDropdown */}
               {/* <NotificationDropdown /> */}
+
+              {/* Notifications bell */}
+              <NotificationsDropdown />
+
+              {/* Session inactivity countdown */}
+              <SessionTimer />
 
               {/* ProfileDropdown */}
               <ProfileDropdown />

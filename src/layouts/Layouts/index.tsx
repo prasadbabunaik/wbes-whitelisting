@@ -8,6 +8,7 @@ import Header from "./Header";
 import Sidebar from "./Sidebar";
 import Footer from "./Footer";
 import RightSidebar from "@common/RightSidebar";
+import EmergencyPopup from "@common/EmergencyPopup";
 
 //import actions
 import {
@@ -159,6 +160,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         </div>
       </div>
       {/* <RightSidebar /> */}
+      <EmergencyPopup />
     </>
   );
 };

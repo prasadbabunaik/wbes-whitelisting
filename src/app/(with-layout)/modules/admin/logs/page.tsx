@@ -5,7 +5,36 @@ import { Container, Row, Col, Card, CardBody, CardHeader, Input, Table, Badge, S
 import BreadCrumb from "@common/BreadCrumb";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { ToastContainer, toast } from "react-toastify";
+import Select from "react-select";
 import "react-toastify/dist/ReactToastify.css";
+
+type SelectOpt = { label: string; value: string };
+
+const STATUS_OPTS: SelectOpt[] = [
+  { value: "UNDER_NLDC_REVIEW", label: "Under NLDC Review" },
+  { value: "SENT_TO_CISO",      label: "Sent to CISO" },
+  { value: "CISO_APPROVED",     label: "CISO Approved" },
+  { value: "SENT_TO_SOC",       label: "Sent to SOC" },
+  { value: "SOC_VERIFIED",      label: "SOC Verified" },
+  { value: "SENT_TO_IT",        label: "Sent to IT" },
+  { value: "COMPLETED",         label: "Completed" },
+  { value: "REJECTED",          label: "Rejected" },
+  { value: "NEED_MORE_INFO",    label: "Need More Info" },
+];
+
+const CATEGORY_OPTS: SelectOpt[] = [
+  { value: "NEW_USER",      label: "New User" },
+  { value: "EXISTING_USER", label: "Existing User" },
+];
+
+const REGION_OPTS: SelectOpt[] = [
+  { value: "NLDC",   label: "NLDC" },
+  { value: "NRLDC",  label: "NRLDC" },
+  { value: "SRLDC",  label: "SRLDC" },
+  { value: "WRLDC",  label: "WRLDC" },
+  { value: "ERLDC",  label: "ERLDC" },
+  { value: "NERLDC", label: "NERLDC" },
+];
 
 const ORG_REGION_MAP: Record<string, string> = {
   "org-id-srldc": "SRLDC",
@@ -21,11 +50,32 @@ export default function AuditLogsPage() {
   const [entities, setEntities] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState("ALL");
+  const [searchTerm,      setSearchTerm]      = useState("");
+  const [dateFilter,      setDateFilter]      = useState("ALL");
+  const [statusFilter,    setStatusFilter]    = useState<SelectOpt[]>([]);
+  const [categoryFilter,  setCategoryFilter]  = useState<SelectOpt | null>(null);
+  const [regionFilter,    setRegionFilter]    = useState<SelectOpt | null>(null);
+  const [emergencyFilter, setEmergencyFilter] = useState(false);
 
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
+
+  const [sortKey, setSortKey]   = useState<string>("createdAt");
+  const [sortDir, setSortDir]   = useState<"asc" | "desc">("desc");
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <span className="ms-1" style={{ fontSize: "11px", opacity: 0.35 }}>⇅</span>;
+    return <span className="ms-1" style={{ fontSize: "11px" }}>{sortDir === "asc" ? "▲" : "▼"}</span>;
+  };
 
   // 🛡️ SECURE TOKEN EXTRACTION
   const authData = useMemo(() => {
@@ -145,24 +195,58 @@ export default function AuditLogsPage() {
 
   const toggleModal = () => setModalOpen(!modalOpen);
 
-  const filteredData = data.filter((req) => {
+  const filteredData = useMemo(() => {
     const searchLower = searchTerm.toLowerCase();
-    const matchesText = 
-      (req.ticketNo || "").toLowerCase().includes(searchLower) ||
-      (req.entityName || "").toLowerCase().includes(searchLower) ||
-      (req.username || "").toLowerCase().includes(searchLower) ||
-      (req.ips?.some((ipObj: any) => ipObj.ipAddress.includes(searchLower)));
+    const allowedStatuses = new Set(statusFilter.map((o) => o.value));
 
-    let matchesDate = true;
-    if (dateFilter !== "ALL") {
-      const days = parseInt(dateFilter, 10);
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - days);
-      matchesDate = new Date(req.createdAt) >= cutoffDate;
-    }
+    return data.filter((req: any) => {
+      // text search
+      const matchesText =
+        !searchLower ||
+        (req.ticketNo   || "").toLowerCase().includes(searchLower) ||
+        (req.entityName || "").toLowerCase().includes(searchLower) ||
+        (req.username   || "").toLowerCase().includes(searchLower) ||
+        req.ips?.some((ip: any) => ip.ipAddress.includes(searchLower));
 
-    return matchesText && matchesDate;
-  });
+      // date range
+      let matchesDate = true;
+      if (dateFilter !== "ALL") {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - parseInt(dateFilter, 10));
+        matchesDate = new Date(req.createdAt) >= cutoff;
+      }
+
+      // status multi-select
+      const matchesStatus = allowedStatuses.size === 0 || allowedStatuses.has(req.status);
+
+      // category
+      const matchesCategory = !categoryFilter || req.category === categoryFilter.value;
+
+      // region
+      const reqRegion = (req.initiatorRegion || req.submittedByRole || "").toUpperCase();
+      const matchesRegion = !regionFilter || reqRegion === regionFilter.value;
+
+      // emergency
+      const matchesEmergency = !emergencyFilter || req.isEmergency === true;
+
+      return matchesText && matchesDate && matchesStatus && matchesCategory && matchesRegion && matchesEmergency;
+    }).sort((a: any, b: any) => {
+      let aVal = a[sortKey] ?? "";
+      let bVal = b[sortKey] ?? "";
+      if (sortKey === "createdAt") {
+        aVal = new Date(aVal).getTime();
+        bVal = new Date(bVal).getTime();
+      } else {
+        aVal = String(aVal).toLowerCase();
+        bVal = String(bVal).toLowerCase();
+      }
+      if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [data, searchTerm, dateFilter, statusFilter, categoryFilter, regionFilter, emergencyFilter, sortKey, sortDir]);
+
+  const hasActiveFilters = statusFilter.length > 0 || categoryFilter || regionFilter || emergencyFilter || dateFilter !== "ALL";
 
   const exportToCSV = () => {
     if (filteredData.length === 0) {
@@ -267,33 +351,78 @@ export default function AuditLogsPage() {
             <BreadCrumb title="Comprehensive Audit Logs" pageTitle="Administration" />
 
             <Card>
-              <CardHeader className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-                <h5 className="card-title mb-0">System Request History <Badge color="soft-info" className="text-info ms-2">{myRegion !== "UNKNOWN" && myRegion !== "RLDC" ? myRegion : ""}</Badge></h5>
-                <div className="d-flex flex-wrap gap-2 justify-content-md-end">
-                  <InputGroup style={{ width: "220px" }}>
-                    <InputGroupText className="bg-light border-light"><i className="ri-search-line"></i></InputGroupText>
-                    <Input 
-                      type="text" 
-                      placeholder="Search Ticket, IP..." 
-                      value={searchTerm}
-                      className="bg-light border-light"
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </InputGroup>
-                  <Input 
-                    type="select" 
-                    style={{ width: "160px" }}
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
-                  >
-                    <option value="ALL">All Time</option>
-                    <option value="1">Last 24 Hours</option>
-                    <option value="7">Last 7 Days</option>
-                    <option value="30">Last 30 Days</option>
-                  </Input>
-                  <Button color="success" onClick={exportToCSV} className="d-flex align-items-center">
-                    <i className="ri-file-excel-2-line me-1"></i> Export
-                  </Button>
+              <CardHeader>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h5 className="card-title mb-0">
+                    System Request History
+                    {myRegion !== "UNKNOWN" && myRegion !== "RLDC" && (
+                      <Badge color="soft-info" className="text-info ms-2">{myRegion}</Badge>
+                    )}
+                  </h5>
+                  <div className="d-flex gap-2">
+                    {hasActiveFilters && (
+                      <Button color="outline-secondary" size="sm" onClick={() => { setStatusFilter([]); setCategoryFilter(null); setRegionFilter(null); setEmergencyFilter(false); setDateFilter("ALL"); setSearchTerm(""); }}>
+                        <i className="ri-filter-off-line me-1"></i> Clear Filters
+                      </Button>
+                    )}
+                    <Button color="success" size="sm" onClick={exportToCSV} className="d-flex align-items-center">
+                      <i className="ri-file-excel-2-line me-1"></i> Export CSV
+                    </Button>
+                    <Button color="soft-info" size="sm" onClick={fetchAuditLogs} className="d-flex align-items-center">
+                      <i className="ri-refresh-line me-1"></i> Refresh
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Filter bar */}
+                <div className="bg-light rounded p-3 border">
+                  <Row className="g-2 align-items-end">
+                    <Col lg={3} md={6}>
+                      <label className="form-label text-muted small fw-semibold text-uppercase mb-1">Search</label>
+                      <InputGroup>
+                        <InputGroupText className="bg-white border-end-0"><i className="ri-search-line text-muted"></i></InputGroupText>
+                        <Input type="text" placeholder="Ticket, entity, IP…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="border-start-0" style={{ fontSize: "13px" }} />
+                      </InputGroup>
+                    </Col>
+
+                    <Col lg={2} md={6}>
+                      <label className="form-label text-muted small fw-semibold text-uppercase mb-1">Date Range</label>
+                      <Input type="select" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} style={{ fontSize: "13px" }}>
+                        <option value="ALL">All Time</option>
+                        <option value="1">Last 24 Hours</option>
+                        <option value="7">Last 7 Days</option>
+                        <option value="30">Last 30 Days</option>
+                      </Input>
+                    </Col>
+
+                    <Col lg={3} md={6}>
+                      <label className="form-label text-muted small fw-semibold text-uppercase mb-1">Status</label>
+                      <Select isMulti options={STATUS_OPTS} value={statusFilter} onChange={(v) => setStatusFilter(v as SelectOpt[])} placeholder="All statuses…" styles={{ control: (b) => ({ ...b, fontSize: "13px", minHeight: "36px" }), multiValue: (b) => ({ ...b, backgroundColor: "#405189" }), multiValueLabel: (b) => ({ ...b, color: "white", fontSize: "11px" }), multiValueRemove: (b) => ({ ...b, color: "white" }) }} />
+                    </Col>
+
+                    <Col lg={2} md={6}>
+                      <label className="form-label text-muted small fw-semibold text-uppercase mb-1">Category</label>
+                      <Select isClearable options={CATEGORY_OPTS} value={categoryFilter} onChange={(v) => setCategoryFilter(v as SelectOpt | null)} placeholder="All…" styles={{ control: (b) => ({ ...b, fontSize: "13px", minHeight: "36px" }) }} />
+                    </Col>
+
+                    <Col lg={1} md={6}>
+                      <label className="form-label text-muted small fw-semibold text-uppercase mb-1">Region</label>
+                      <Select isClearable options={REGION_OPTS} value={regionFilter} onChange={(v) => setRegionFilter(v as SelectOpt | null)} placeholder="All…" styles={{ control: (b) => ({ ...b, fontSize: "13px", minHeight: "36px" }) }} />
+                    </Col>
+
+                    <Col lg={1} md={6}>
+                      <label className="form-label text-muted small fw-semibold text-uppercase mb-1">Emergency</label>
+                      <button className={`btn btn-sm w-100 ${emergencyFilter ? "btn-danger" : "btn-outline-secondary"}`} onClick={() => setEmergencyFilter((v) => !v)}>
+                        <i className="ri-alarm-warning-line"></i>
+                      </button>
+                    </Col>
+
+                    {hasActiveFilters && (
+                      <Col lg={12}>
+                        <span className="badge bg-warning text-dark">{filteredData.length} / {data.length} records shown</span>
+                      </Col>
+                    )}
+                  </Row>
                 </div>
               </CardHeader>
               
@@ -305,11 +434,21 @@ export default function AuditLogsPage() {
                     <Table className="table-striped table-hover align-middle mb-0">
                       <thead className="table-light">
                         <tr>
-                          <th>Ticket No</th>
-                          <th>Entity / Username</th>
-                          <th>Category</th>
-                          <th>Created At</th>
-                          <th>Status</th>
+                          {[
+                            { label: "Ticket No",         key: "ticketNo"    },
+                            { label: "Entity / Username", key: "entityName"  },
+                            { label: "Category",          key: "category"    },
+                            { label: "Created At",        key: "createdAt"   },
+                            { label: "Status",            key: "status"      },
+                          ].map(({ label, key }) => (
+                            <th
+                              key={key}
+                              style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
+                              onClick={() => handleSort(key)}
+                            >
+                              {label}<SortIcon col={key} />
+                            </th>
+                          ))}
                           <th>Action</th>
                         </tr>
                       </thead>

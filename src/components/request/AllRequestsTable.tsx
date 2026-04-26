@@ -34,6 +34,34 @@ interface SelectOption {
   value: string;
 }
 
+const STATUS_OPTIONS: SelectOption[] = [
+  { value: "UNDER_NLDC_REVIEW", label: "Under NLDC Review" },
+  { value: "SENT_TO_CISO",      label: "Sent to CISO" },
+  { value: "CISO_APPROVED",     label: "CISO Approved" },
+  { value: "SENT_TO_SOC",       label: "Sent to SOC" },
+  { value: "SOC_VERIFIED",      label: "SOC Verified" },
+  { value: "SENT_TO_IT",        label: "Sent to IT" },
+  { value: "WHITELISTED",       label: "Whitelisted" },
+  { value: "COMPLETED",         label: "Completed" },
+  { value: "NEED_MORE_INFO",    label: "Need More Info" },
+  { value: "REJECTED",          label: "Rejected" },
+  { value: "CREATED",           label: "Created" },
+];
+
+const CATEGORY_OPTIONS: SelectOption[] = [
+  { value: "NEW_USER",      label: "New User" },
+  { value: "EXISTING_USER", label: "Existing User" },
+];
+
+const REGION_OPTIONS: SelectOption[] = [
+  { value: "NLDC",   label: "NLDC" },
+  { value: "NRLDC",  label: "NRLDC" },
+  { value: "SRLDC",  label: "SRLDC" },
+  { value: "WRLDC",  label: "WRLDC" },
+  { value: "ERLDC",  label: "ERLDC" },
+  { value: "NERLDC", label: "NERLDC" },
+];
+
 const ORG_REGION_MAP: Record<string, string> = {
   "org-id-srldc": "SRLDC",
   "org-id-nrldc": "NRLDC",
@@ -137,10 +165,27 @@ const AllRequestsTable = ({
   const [deleteModal, setDeleteModal] = useState(false);
   const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isSendingMail, setIsSendingMail] = useState<string | null>(null);
 
   // Editable States for Selects
   const [editIps, setEditIps] = useState<string>("");
   const [editIpToRemove, setEditIpToRemove] = useState<string[]>([]);
+
+  // ── Filter state ───────────────────────────────────────────────────────────
+  const [filterStatus,    setFilterStatus]    = useState<SelectOption[]>([]);
+  const [filterCategory,  setFilterCategory]  = useState<SelectOption | null>(null);
+  const [filterRegion,    setFilterRegion]    = useState<SelectOption | null>(null);
+  const [filterEmergency, setFilterEmergency] = useState<boolean>(false);
+
+  const clearFilters = () => {
+    setFilterStatus([]);
+    setFilterCategory(null);
+    setFilterRegion(null);
+    setFilterEmergency(false);
+  };
+
+  const hasActiveFilters =
+    filterStatus.length > 0 || filterCategory || filterRegion || filterEmergency;
 
   // 🛡️ SECURE TOKEN EXTRACTION
   const authData = useMemo(() => {
@@ -292,6 +337,34 @@ const AllRequestsTable = ({
     }
   }, [selectedRequest]);
 
+  // ── Derived filtered data ─────────────────────────────────────────────────
+  const filteredData = useMemo(() => {
+    let result = data as any[];
+
+    if (filterStatus.length > 0) {
+      const allowed = new Set(filterStatus.map((o) => o.value));
+      result = result.filter((r) => allowed.has(r.status));
+    }
+
+    if (filterCategory) {
+      result = result.filter((r) => r.category === filterCategory.value);
+    }
+
+    if (filterRegion) {
+      result = result.filter(
+        (r) =>
+          (r.initiatorRegion || "").toUpperCase() === filterRegion.value ||
+          (r.submittedByRole || "").toUpperCase() === filterRegion.value
+      );
+    }
+
+    if (filterEmergency) {
+      result = result.filter((r) => r.isEmergency === true);
+    }
+
+    return result;
+  }, [data, filterStatus, filterCategory, filterRegion, filterEmergency]);
+
   const confirmDelete = (requestId: string) => {
     setRequestToDelete(requestId);
     setDeleteModal(true);
@@ -319,6 +392,23 @@ const AllRequestsTable = ({
     } finally {
       setIsDeleting(null);
       toggleDeleteModal();
+    }
+  };
+
+  const handleResendMail = async (requestId: string) => {
+    setIsSendingMail(requestId);
+    try {
+      const res = await fetch(`/api/ip-request/${requestId}/resend-mail`, { method: "POST" });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        toast.success("Email resent successfully.");
+      } else {
+        toast.error(json.error || "Failed to resend email.");
+      }
+    } catch {
+      toast.error("Network error while resending email.");
+    } finally {
+      setIsSendingMail(null);
     }
   };
 
@@ -468,6 +558,21 @@ const AllRequestsTable = ({
               ) : (
                 <button className="btn btn-sm btn-soft-secondary" disabled>
                   {rowData.status === "COMPLETED" ? "Done" : `With ${rowData.currentRole}`}
+                </button>
+              )}
+
+              {/* Resend mail — visible to ADMIN and any role whose turn it is */}
+              {(isAdmin || rowData.currentRole === myRole) && (
+                <button
+                  className="btn btn-sm btn-soft-primary d-flex align-items-center justify-content-center"
+                  style={{ width: "32px", padding: "0.25rem" }}
+                  title="Resend notification email"
+                  disabled={isSendingMail === rowData.id}
+                  onClick={() => handleResendMail(rowData.id)}
+                >
+                  {isSendingMail === rowData.id
+                    ? <Spinner size="sm" />
+                    : <i className="ri-mail-send-line"></i>}
                 </button>
               )}
 
@@ -644,6 +749,83 @@ const AllRequestsTable = ({
                   </button>
                 </CardHeader>
                 <CardBody>
+                  {/* ── Filter Bar ─────────────────────────────────────────── */}
+                  <div className="bg-light rounded p-3 mb-3 border">
+                    <Row className="g-2 align-items-end">
+                      <Col lg={3} md={6}>
+                        <label className="form-label text-muted small fw-semibold text-uppercase mb-1">Status</label>
+                        <Select
+                          isMulti
+                          options={STATUS_OPTIONS}
+                          value={filterStatus}
+                          onChange={(val) => setFilterStatus(val as SelectOption[])}
+                          placeholder="All statuses..."
+                          classNamePrefix="filter-select"
+                          styles={{
+                            control: (b) => ({ ...b, minHeight: "36px", fontSize: "13px" }),
+                            multiValue: (b) => ({ ...b, backgroundColor: "#405189", borderRadius: "3px" }),
+                            multiValueLabel: (b) => ({ ...b, color: "white", fontSize: "11px" }),
+                            multiValueRemove: (b) => ({ ...b, color: "white", ":hover": { backgroundColor: "#2c3a6e" } }),
+                          }}
+                        />
+                      </Col>
+
+                      <Col lg={2} md={6}>
+                        <label className="form-label text-muted small fw-semibold text-uppercase mb-1">Category</label>
+                        <Select
+                          isClearable
+                          options={CATEGORY_OPTIONS}
+                          value={filterCategory}
+                          onChange={(val) => setFilterCategory(val as SelectOption | null)}
+                          placeholder="All..."
+                          classNamePrefix="filter-select"
+                          styles={{ control: (b) => ({ ...b, minHeight: "36px", fontSize: "13px" }) }}
+                        />
+                      </Col>
+
+                      <Col lg={2} md={6}>
+                        <label className="form-label text-muted small fw-semibold text-uppercase mb-1">Region</label>
+                        <Select
+                          isClearable
+                          options={REGION_OPTIONS}
+                          value={filterRegion}
+                          onChange={(val) => setFilterRegion(val as SelectOption | null)}
+                          placeholder="All regions..."
+                          classNamePrefix="filter-select"
+                          styles={{ control: (b) => ({ ...b, minHeight: "36px", fontSize: "13px" }) }}
+                        />
+                      </Col>
+
+                      <Col lg={2} md={6}>
+                        <label className="form-label text-muted small fw-semibold text-uppercase mb-1">Emergency</label>
+                        <div>
+                          <button
+                            className={`btn btn-sm w-100 ${filterEmergency ? "btn-danger" : "btn-outline-secondary"}`}
+                            onClick={() => setFilterEmergency((v) => !v)}
+                          >
+                            <i className={`ri-alarm-warning-line me-1 ${filterEmergency ? "" : "opacity-50"}`}></i>
+                            {filterEmergency ? "Emergency Only" : "Show All"}
+                          </button>
+                        </div>
+                      </Col>
+
+                      <Col lg={3} md={12} className="d-flex align-items-end justify-content-end gap-2">
+                        {hasActiveFilters && (
+                          <span className="badge bg-warning text-dark align-self-center">
+                            {filteredData.length} / {(data as any[]).length} shown
+                          </span>
+                        )}
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={clearFilters}
+                          disabled={!hasActiveFilters}
+                        >
+                          <i className="ri-filter-off-line me-1"></i> Clear
+                        </button>
+                      </Col>
+                    </Row>
+                  </div>
+
                   {loading ? (
                     <div className="text-center py-5">
                       <div className="spinner-border text-primary" role="status"></div>
@@ -651,7 +833,7 @@ const AllRequestsTable = ({
                   ) : (
                     <TableContainer
                       columns={columns || []}
-                      data={data || []}
+                      data={filteredData}
                       isGlobalFilter={true}
                       customPageSize={10}
                       tableClass="table-centered align-middle table-nowrap mb-0"

@@ -187,9 +187,8 @@ const TableContainer = ({
                   <th
                     key={header.id}
                     className={thClass}
-                    {...{
-                      onClick: header.column.getToggleSortingHandler(),
-                    }}
+                    style={header.column.getCanSort() ? { cursor: "pointer", userSelect: "none" } : {}}
+                    onClick={header.column.getToggleSortingHandler()}
                   >
                     {header.isPlaceholder ? null : (
                       <React.Fragment>
@@ -197,10 +196,11 @@ const TableContainer = ({
                           header.column.columnDef.header,
                           header.getContext()
                         )}
-                        {{
-                          asc: " ",
-                          desc: " ",
-                        }[header.column.getIsSorted() as string] ?? null}
+                        {header.column.getCanSort() && (
+                          <span className="ms-1" style={{ fontSize: "11px", opacity: header.column.getIsSorted() ? 1 : 0.35 }}>
+                            {{ asc: "▲", desc: "▼" }[header.column.getIsSorted() as string] ?? "⇅"}
+                          </span>
+                        )}
                         {header.column.getCanFilter() ? (
                           <div>
                             <Filter column={header.column} table={table} />

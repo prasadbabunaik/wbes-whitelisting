@@ -31,8 +31,24 @@ model User {
   sessions       Session[]
 
   entityMappings EntityControllerMapping[]
+  notifications  Notification[]
 
   createdAt      DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  requestId String?
+  ticketNo  String?
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
 }
 
 model Session {
