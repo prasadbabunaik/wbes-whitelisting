@@ -89,7 +89,7 @@ const ProfileDropdown = () => {
         </DropdownToggle>
         <DropdownMenu className="dropdown-menu-end shadow-lg">
           <h6 className="dropdown-header fw-medium bg-light">Welcome {userName}!</h6>
-          
+
           {/* Trigger Modal instead of Router.push */}
           <DropdownItem tag="div" className="p-0">
             <button type="button" onClick={toggleResetModal} className="dropdown-item d-flex align-items-center py-2 w-100 bg-transparent border-0 text-start">

@@ -265,6 +265,12 @@ const Navdata = () => {
           link: "/modules/admin/reports",
           parentId: "admin",
         },
+        {
+          id: "bulk-upload",
+          label: "Bulk Upload",
+          link: "/modules/admin/bulk-upload",
+          parentId: "admin",
+        },
       ],
     },
     // {

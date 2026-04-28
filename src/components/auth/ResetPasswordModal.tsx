@@ -85,7 +85,7 @@ const ResetPasswordModal = ({ isOpen, toggle, isAdmin, currentUserId, currentUse
 
   return (
     <>
-      {/* <ToastContainer closeButton={false} limit={1} />  Toast Container inside component */}
+      <ToastContainer closeButton={false} limit={1} position="top-right" autoClose={3000} />
       <Modal isOpen={isOpen} toggle={toggle} centered size="md">
         <ModalHeader toggle={toggle} className="bg-light p-3">
           <div className="d-flex align-items-center">

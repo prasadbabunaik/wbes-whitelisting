@@ -27,6 +27,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, message: "Password updated successfully" });
   } catch (error: any) {
     console.error("RESET_PWD_ERROR:", error.message);
+    const msg = error.message ?? "";
+    if (msg.includes("Unauthorized")) return NextResponse.json({ error: msg }, { status: 401 });
+    if (msg.includes("Forbidden"))    return NextResponse.json({ error: msg }, { status: 403 });
     return NextResponse.json({ error: "Failed to reset password" }, { status: 500 });
   }
 }

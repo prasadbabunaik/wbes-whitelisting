@@ -2,7 +2,12 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Dropdown, DropdownToggle, DropdownMenu, Badge } from "reactstrap";
+import {
+  UncontrolledDropdown,
+  DropdownToggle,
+  DropdownMenu,
+} from "reactstrap";
+import SimpleBar from "simplebar-react";
 
 interface Notification {
   id: string;
@@ -18,18 +23,18 @@ const POLL_INTERVAL_MS = 30_000;
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (diff < 60)  return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 60)    return `${diff}s ago`;
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
 const NotificationsDropdown: React.FC = () => {
   const router = useRouter();
-  const [isOpen, setIsOpen]             = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount]   = useState(0);
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const [unreadCount, setUnreadCount]     = useState(0);
+  const pollRef    = useRef<NodeJS.Timeout | null>(null);
+  const isOpenRef  = useRef(false);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -43,7 +48,6 @@ const NotificationsDropdown: React.FC = () => {
     } catch (_) {}
   }, []);
 
-  // Initial fetch + polling
   useEffect(() => {
     fetchNotifications();
     pollRef.current = setInterval(fetchNotifications, POLL_INTERVAL_MS);
@@ -58,53 +62,56 @@ const NotificationsDropdown: React.FC = () => {
     } catch (_) {}
   };
 
-  const handleOpen = () => {
-    setIsOpen((v) => {
-      if (!v && unreadCount > 0) markAllRead();
-      return !v;
-    });
+  const handleToggleClick = () => {
+    if (!isOpenRef.current && unreadCount > 0) markAllRead();
+    isOpenRef.current = !isOpenRef.current;
   };
 
   const handleNotifClick = (n: Notification) => {
-    setIsOpen(false);
     if (n.link) router.push(n.link);
   };
 
   return (
-    <Dropdown isOpen={isOpen} toggle={handleOpen} className="topbar-head-dropdown header-item">
+    <UncontrolledDropdown
+      nav
+      inNavbar
+      className="topbar-head-dropdown ms-1 header-item"
+    >
       <DropdownToggle
         tag="button"
         type="button"
-        className="btn btn-icon btn-topbar btn-ghost-secondary rounded-circle position-relative"
-        style={{ width: "38px", height: "38px" }}
+        className="btn btn-icon btn-topbar btn-ghost-secondary rounded-circle"
+        onClick={handleToggleClick}
       >
         <i className="bx bx-bell fs-22"></i>
         {unreadCount > 0 && (
-          <span
-            className="position-absolute bg-danger text-white rounded-circle d-flex align-items-center justify-content-center fw-bold"
-            style={{ top: "2px", right: "2px", width: "18px", height: "18px", fontSize: "10px", lineHeight: 1 }}
-          >
+          <span className="position-absolute topbar-badge fs-10 translate-middle badge rounded-pill bg-danger">
             {unreadCount > 9 ? "9+" : unreadCount}
+            <span className="visually-hidden">unread notifications</span>
           </span>
         )}
       </DropdownToggle>
 
-      <DropdownMenu end className="dropdown-menu-lg shadow-lg p-0" style={{ width: "360px" }}>
+      <DropdownMenu className="dropdown-menu-lg dropdown-menu-end p-0 shadow-lg">
         {/* Header */}
-        <div className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-light rounded-top">
-          <h6 className="mb-0 fw-semibold">Notifications</h6>
-          {unreadCount > 0 && (
-            <button className="btn btn-sm btn-link p-0 text-muted text-decoration-none" style={{ fontSize: "12px" }} onClick={markAllRead}>
-              Mark all read
-            </button>
-          )}
+        <div className="dropdown-head bg-primary bg-pattern rounded-top">
+          <div className="p-3">
+            <div className="d-flex align-items-center justify-content-between">
+              <h6 className="m-0 fs-16 fw-semibold text-white">Notifications</h6>
+              {unreadCount > 0 && (
+                <span className="badge bg-light-subtle fs-13 text-body">
+                  {unreadCount} New
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* List */}
-        <div style={{ maxHeight: "340px", overflowY: "auto" }}>
+        <SimpleBar style={{ maxHeight: "300px" }} className="pe-2">
           {notifications.length === 0 ? (
-            <div className="text-center text-muted py-4" style={{ fontSize: "13px" }}>
-              <i className="bx bx-bell-off fs-24 d-block mb-2 opacity-50"></i>
+            <div className="text-center text-muted py-5" style={{ fontSize: "13px" }}>
+              <i className="bx bx-bell-off fs-28 d-block mb-2 opacity-50"></i>
               No notifications yet
             </div>
           ) : (
@@ -112,55 +119,55 @@ const NotificationsDropdown: React.FC = () => {
               <div
                 key={n.id}
                 onClick={() => handleNotifClick(n)}
-                className={`d-flex gap-3 px-3 py-2 border-bottom ${n.link ? "cursor-pointer" : ""} ${!n.isRead ? "bg-primary bg-opacity-10" : ""}`}
-                style={{ cursor: n.link ? "pointer" : "default", transition: "background 0.15s" }}
-                onMouseEnter={(e) => { if (n.link) (e.currentTarget as HTMLElement).style.background = "rgba(64,81,137,0.08)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
+                className={`text-reset notification-item d-block dropdown-item position-relative${!n.isRead ? " active" : ""}`}
+                style={{ cursor: n.link ? "pointer" : "default" }}
               >
-                {/* Icon dot */}
-                <div className="flex-shrink-0 mt-1">
-                  <span
-                    className="rounded-circle d-inline-block"
-                    style={{
-                      width: "8px", height: "8px", marginTop: "4px",
-                      background: !n.isRead ? "#405189" : "#ced4da",
-                    }}
-                  />
-                </div>
-
-                <div className="flex-grow-1 min-width-0">
-                  <div className="d-flex justify-content-between align-items-start gap-1">
-                    <p className="mb-0 fw-semibold text-dark" style={{ fontSize: "13px", lineHeight: "1.3" }}>
-                      {n.title}
-                    </p>
-                    <span className="text-muted flex-shrink-0" style={{ fontSize: "11px" }}>
-                      {timeAgo(n.createdAt)}
+                <div className="d-flex">
+                  <div className="avatar-xs me-3 mt-1">
+                    <span
+                      className={`avatar-title rounded-circle fs-16 ${
+                        !n.isRead
+                          ? "bg-primary-subtle text-primary"
+                          : "bg-secondary-subtle text-secondary"
+                      }`}
+                    >
+                      <i className="bx bx-bell"></i>
                     </span>
                   </div>
-                  <p className="mb-0 text-muted" style={{ fontSize: "12px", lineHeight: "1.4" }}>
-                    {n.message}
-                  </p>
-                  {n.ticketNo && (
-                    <Badge color="soft-primary" className="text-primary mt-1" style={{ fontSize: "10px" }}>
-                      {n.ticketNo}
-                    </Badge>
-                  )}
+                  <div className="flex-grow-1">
+                    <div className="d-flex justify-content-between align-items-start">
+                      <h6 className="mt-0 mb-1 fs-13 fw-semibold">{n.title}</h6>
+                      <span className="text-muted fs-11 flex-shrink-0 ms-2">
+                        {timeAgo(n.createdAt)}
+                      </span>
+                    </div>
+                    <p className="mb-1 fs-13 text-muted lh-base">{n.message}</p>
+                    {n.ticketNo && (
+                      <p className="mb-0 fs-11 fw-medium text-uppercase text-muted">
+                        <i className="mdi mdi-ticket-outline me-1"></i>{n.ticketNo}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
           )}
-        </div>
+        </SimpleBar>
 
         {/* Footer */}
         {notifications.length > 0 && (
-          <div className="text-center py-2 border-top">
-            <button className="btn btn-sm btn-link text-muted text-decoration-none" style={{ fontSize: "12px" }} onClick={() => { setIsOpen(false); router.push("/modules/request/all"); }}>
-              View all requests <i className="ri-arrow-right-line align-bottom"></i>
+          <div className="my-3 text-center">
+            <button
+              type="button"
+              className="btn btn-soft-success waves-effect waves-light btn-sm"
+              onClick={() => router.push("/modules/request/all")}
+            >
+              View All Requests <i className="ri-arrow-right-line align-middle"></i>
             </button>
           </div>
         )}
       </DropdownMenu>
-    </Dropdown>
+    </UncontrolledDropdown>
   );
 };
 

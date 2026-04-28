@@ -97,33 +97,33 @@ const Login = () => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="mb-3">
           <label className="form-label fw-medium">Email Address</label>
-          <input 
-            type="email" 
-            name="email" 
-            value={formData.email} 
-            onChange={handleChange} 
-            placeholder="Enter your email" 
-            className="form-control" 
-            required 
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="Enter your email"
+            className="form-control"
+            required
           />
         </div>
 
         <div className="mb-4">
           <label className="form-label fw-medium">Password</label>
-          <input 
-            type="password" 
-            name="password" 
-            value={formData.password} 
-            onChange={handleChange} 
-            placeholder="Enter your password" 
-            className="form-control" 
-            required 
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Enter your password"
+            className="form-control"
+            required
           />
         </div>
 
-        <button 
-          type="submit" 
-          disabled={loading} 
+        <button
+          type="submit"
+          disabled={loading}
           className="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center"
         >
           {loading ? <><Spinner size="sm" className="me-2" /> Processing...</> : "Login"}
