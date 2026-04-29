@@ -11,11 +11,51 @@ function generateTicketNo(): string {
   return `WBES-BK-${y}${m}${d}-${rand}`;
 }
 
+function ipToInt(ip: string): number {
+  const p = ip.split(".").map(Number);
+  return ((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]) >>> 0;
+}
+function intToIp(n: number): string {
+  return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".");
+}
+function isValidIp(ip: string): boolean {
+  const parts = ip.split(".");
+  return parts.length === 4 && parts.every((p) => { const n = Number(p); return /^\d+$/.test(p) && n >= 0 && n <= 255; });
+}
+function expandCidr(cidr: string): string[] {
+  const [ipStr, maskStr] = cidr.split("/");
+  if (!isValidIp(ipStr)) return [cidr];
+  const maskLen = parseInt(maskStr, 10);
+  if (isNaN(maskLen) || maskLen < 0 || maskLen > 32) return [cidr];
+  const maskInt  = maskLen === 0 ? 0 : (0xffffffff << (32 - maskLen)) >>> 0;
+  const network  = (ipToInt(ipStr) & maskInt) >>> 0;
+  const broadcast = (network | (~maskInt >>> 0)) >>> 0;
+  const count = broadcast - network + 1;
+  if (count > 1024) return [cidr];
+  const result: string[] = [];
+  for (let i = network; i <= broadcast; i++) result.push(intToIp(i));
+  return result;
+}
+
 function extractIps(raw: string): string[] {
   if (!raw) return [];
-  const ipRegex = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,2})?\b/g;
-  const matches = raw.match(ipRegex) || [];
-  return [...new Set(matches.map((ip) => ip.trim()))];
+  const normalised = String(raw)
+    .replace(/[\r\n\t;|]+/g, ",")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const cidrRegex = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,2})?)/g;
+  const tokens = normalised.match(cidrRegex) || [];
+
+  const result: string[] = [];
+  for (const token of tokens) {
+    if (token.includes("/")) {
+      result.push(...expandCidr(token));
+    } else if (isValidIp(token)) {
+      result.push(token);
+    }
+  }
+  return [...new Set(result)];
 }
 
 export async function POST(req: Request) {
@@ -33,6 +73,7 @@ export async function POST(req: Request) {
         ipAddresses: string;
         remarks: string;
         region?: string;
+        isApiAccess?: boolean;
       }>;
     };
 
@@ -65,11 +106,11 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // 1. Upsert Entity
+        // 1. Upsert Entity — always update region so re-uploads fix missing region
         const entity = await prisma.entity.upsert({
           where:  { name: entityName },
           create: { name: entityName, region: row.region ?? null },
-          update: {},
+          update: row.region ? { region: row.region } : {},
         });
 
         // 2. Upsert BeneficiaryUser
@@ -82,35 +123,42 @@ export async function POST(req: Request) {
           });
         }
 
-        // 3. Create completed IpRequest
-        const ticketNo = generateTicketNo();
-        const request = await prisma.ipRequest.create({
-          data: {
-            userId:          user.id,
-            organizationId:  nldc.id,
-            category:        "NEW_USER",
-            status:          "COMPLETED",
-            entityName,
-            username:        username || entityName,
-            currentRole:     "IT",
-            submittedByRole: "RLDC",
-            ticketNo,
-            remarks:         (row.remarks || "Backdated bulk import").trim(),
-            initiatorRegion: row.region || "NLDC",
-            ips: {
-              create: ips.map((ip) => ({ ipAddress: ip })),
-            },
-          },
+        // 3. Skip IpRequest creation if any completed record already exists for this entity
+        const existingRequest = await prisma.ipRequest.findFirst({
+          where: { entityName, status: "COMPLETED" },
         });
 
-        // 4. IpWhitelist
-        for (const ip of ips) {
-          await prisma.ipWhitelist.create({
-            data: { userId: user.id, ipAddress: ip, active: true, requestId: request.id },
+        if (!existingRequest) {
+          const ticketNo = generateTicketNo();
+          const request = await prisma.ipRequest.create({
+            data: {
+              userId:          user.id,
+              organizationId:  nldc.id,
+              category:        "NEW_USER",
+              status:          "COMPLETED",
+              entityName,
+              username:        username || entityName,
+              currentRole:     "IT",
+              submittedByRole: "RLDC",
+              ticketNo,
+              remarks:         (row.remarks || "Backdated bulk import").trim(),
+              initiatorRegion: row.region || "NLDC",
+              isApiAccess:     row.isApiAccess ?? false,
+              ips: {
+                create: ips.map((ip) => ({ ipAddress: ip })),
+              },
+            },
           });
+
+          // 4. IpWhitelist
+          for (const ip of ips) {
+            await prisma.ipWhitelist.create({
+              data: { userId: user.id, ipAddress: ip, active: true, requestId: request.id },
+            });
+          }
         }
 
-        // 5. BeneficiaryUserIP (skip duplicates)
+        // 5. BeneficiaryUserIP (skip duplicates — runs on both new and re-upload)
         if (beneficiaryUser) {
           for (const ip of ips) {
             const exists = await prisma.beneficiaryUserIP.findFirst({

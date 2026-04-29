@@ -18,17 +18,60 @@ interface UploadRow {
   ipAddresses: string;
   remarks: string;
   region: string;
+  isApiAccess: boolean;
   parsedIps: string[];
   hasError: boolean;
   errorMsg: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function ipToInt(ip: string): number {
+  const p = ip.split(".").map(Number);
+  return ((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]) >>> 0;
+}
+function intToIp(n: number): string {
+  return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".");
+}
+function isValidIp(ip: string): boolean {
+  const parts = ip.split(".");
+  return parts.length === 4 && parts.every((p) => { const n = Number(p); return /^\d+$/.test(p) && n >= 0 && n <= 255; });
+}
+function expandCidr(cidr: string): string[] {
+  const [ipStr, maskStr] = cidr.split("/");
+  if (!isValidIp(ipStr)) return [cidr];
+  const maskLen = parseInt(maskStr, 10);
+  if (isNaN(maskLen) || maskLen < 0 || maskLen > 32) return [cidr];
+  const maskInt  = maskLen === 0 ? 0 : (0xffffffff << (32 - maskLen)) >>> 0;
+  const network  = (ipToInt(ipStr) & maskInt) >>> 0;
+  const broadcast = (network | (~maskInt >>> 0)) >>> 0;
+  const count = broadcast - network + 1;
+  if (count > 1024) return [cidr];   // keep as-is if subnet is too large
+  const result: string[] = [];
+  for (let i = network; i <= broadcast; i++) result.push(intToIp(i));
+  return result;
+}
+
 function extractIps(raw: string): string[] {
   if (!raw) return [];
-  const ipRegex = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,2})?\b/g;
-  const matches = String(raw).match(ipRegex) || [];
-  return [...new Set(matches.map((ip) => ip.trim()))];
+  // Normalise all common delimiters to comma, then tokenise
+  const normalised = String(raw)
+    .replace(/[\r\n\t;|]+/g, ",")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Pull out every IP/CIDR token — no word-boundary needed after tokenisation
+  const cidrRegex = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,2})?)/g;
+  const tokens = normalised.match(cidrRegex) || [];
+
+  const result: string[] = [];
+  for (const token of tokens) {
+    if (token.includes("/")) {
+      result.push(...expandCidr(token));
+    } else if (isValidIp(token)) {
+      result.push(token);
+    }
+  }
+  return [...new Set(result)];
 }
 
 const KNOWN_HEADERS: Record<string, keyof Omit<UploadRow, "_id" | "parsedIps" | "hasError" | "errorMsg">> = {
@@ -84,15 +127,16 @@ function parseSheet(workbook: XLSX.WorkBook, sheetName: string): UploadRow[] {
     if (isEmpty) continue;
 
     const row: UploadRow = {
-      _id:         ++_idCounter,
-      username:    "",
-      entityName:  "",
-      ipAddresses: "",
-      remarks:     "",
-      region:      "",
-      parsedIps:   [],
-      hasError:    false,
-      errorMsg:    "",
+      _id:          ++_idCounter,
+      username:     "",
+      entityName:   "",
+      ipAddresses:  "",
+      remarks:      "",
+      region:       "",
+      isApiAccess:  false,
+      parsedIps:    [],
+      hasError:     false,
+      errorMsg:     "",
     };
 
     Object.entries(colMap).forEach(([colIdx, field]) => {
@@ -108,11 +152,13 @@ function parseSheet(workbook: XLSX.WorkBook, sheetName: string): UploadRow[] {
     for (const uname of usernames) {
       const r: UploadRow = {
         ...row,
-        _id:      ++_idCounter,
-        username: uname,
-        parsedIps: extractIps(row.ipAddresses),
-        hasError:  false,
-        errorMsg:  "",
+        _id:          ++_idCounter,
+        username:     uname,
+        region:       row.region || sheetName,
+        isApiAccess:  false,
+        parsedIps:    extractIps(row.ipAddresses),
+        hasError:     false,
+        errorMsg:     "",
       };
       if (!r.entityName) { r.hasError = true; r.errorMsg = "Missing entity name"; }
       else if (r.parsedIps.length === 0) { r.hasError = true; r.errorMsg = "No valid IPs found"; }
@@ -183,6 +229,9 @@ export default function BulkUploadPage() {
   // ── Row editing ──────────────────────────────────────────────────────────
   const deleteRow = (id: number) => setRows((prev) => prev.filter((r) => r._id !== id));
 
+  const toggleApiAccess = (id: number) =>
+    setRows((prev) => prev.map((r) => r._id === id ? { ...r, isApiAccess: !r.isApiAccess } : r));
+
   const updateCell = (id: number, field: keyof UploadRow, value: string) => {
     setRows((prev) =>
       prev.map((r) => {
@@ -243,11 +292,12 @@ export default function BulkUploadPage() {
         headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
         body: JSON.stringify({
           records: validRows.map((r) => ({
-            username:    r.username,
-            entityName:  r.entityName,
-            ipAddresses: r.ipAddresses,
-            remarks:     r.remarks,
-            region:      r.region,
+            username:     r.username,
+            entityName:   r.entityName,
+            ipAddresses:  r.ipAddresses,
+            remarks:      r.remarks,
+            region:       r.region,
+            isApiAccess:  r.isApiAccess,
           })),
         }),
       });
@@ -440,6 +490,7 @@ export default function BulkUploadPage() {
                           <th style={{ minWidth: 80 }}>Parsed IPs</th>
                           <th style={{ minWidth: 130 }}>Remarks</th>
                           <th style={{ minWidth: 90 }}>Region</th>
+                          <th style={{ minWidth: 100 }}>API Access</th>
                           <th style={{ width: 70 }}>Status</th>
                           <th style={{ width: 60 }}>Del</th>
                         </tr>
@@ -515,6 +566,18 @@ export default function BulkUploadPage() {
                                 onChange={(e) => updateCell(row._id, "region", e.target.value)}
                                 style={{ minWidth: 70 }}
                               />
+                            </td>
+
+                            <td className="text-center">
+                              <div className="form-check form-switch d-flex justify-content-center mb-0">
+                                <input
+                                  type="checkbox"
+                                  className="form-check-input"
+                                  checked={row.isApiAccess}
+                                  onChange={() => toggleApiAccess(row._id)}
+                                  title={row.isApiAccess ? "API Access: Yes" : "API Access: No"}
+                                />
+                              </div>
                             </td>
 
                             <td className="text-center">
