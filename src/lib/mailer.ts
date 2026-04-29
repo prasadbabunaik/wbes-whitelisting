@@ -144,6 +144,8 @@ export function getEmailRouting(
   return { to: uniqueTo.join(", "), cc: uniqueCc.join(", ") };
 }
 
+const PORTAL_URL = process.env.NEXT_PUBLIC_DEV_API_URL ?? "#";
+
 // ── Email templates ───────────────────────────────────────────────────────────
 function workflowEmailTemplate(
   ticketNo: string,
@@ -154,25 +156,53 @@ function workflowEmailTemplate(
   remarks: string
 ): string {
   return `
-    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px">
-      <p>Sir/Madam,</p>
-      <p>
-        The IP Whitelisting request for <strong>${entityName}</strong>
-        (Ticket: <strong>${ticketNo}</strong>) has been
-        <strong><span style="color:${actionColor}">${actionText}</span></strong>
-        at the <strong>${actorRole}</strong> stage.
-      </p>
-      <p><strong>Remarks:</strong> ${remarks || "—"}</p>
-      <p>
-        Please log into the
-        <a href="${process.env.NEXT_PUBLIC_DEV_API_URL ?? "#"}">WBES Administration Portal</a>
-        to view the full timeline and take any further action.
-      </p>
-      <br/>
-      <p>धन्यवाद एवं आभार / Thanks and Regards,<br/>
-      <strong>WBES Administration Portal</strong><br/>
-      Grid Controller of India Limited</p>
-    </div>`;
+<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.8;max-width:600px;">
+
+  <p>Sir/Madam,</p>
+
+  <p>
+    Please be informed that the IP Whitelisting request for <strong>${entityName}</strong>
+    (Ticket No: <strong>${ticketNo}</strong>) has been
+    <strong style="color:${actionColor};">${actionText}</strong>
+    at the <strong>${actorRole}</strong> stage.
+  </p>
+
+  <table style="border-collapse:collapse;width:100%;margin:16px 0;">
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;width:35%;">Ticket No.</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">${ticketNo}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Entity / Beneficiary</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">${entityName}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Status</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;color:${actionColor};font-weight:bold;">${actionText}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Stage</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">${actorRole}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Remarks</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">${remarks || "—"}</td>
+    </tr>
+  </table>
+
+  <p>
+    Please log into the <a href="${PORTAL_URL}">WBES Administration Portal</a>
+    to view the full timeline and take any further action.
+  </p>
+
+  <br/>
+  <p>
+    धन्यवाद एवं आभार / Thanks and Regards,<br/>
+    <strong>WBES Administration Portal</strong><br/>
+    Grid Controller of India Limited
+  </p>
+
+</div>`;
 }
 
 function alertEmailTemplate(
@@ -182,32 +212,57 @@ function alertEmailTemplate(
   hoursPending: number
 ): string {
   return `
-    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px">
-      <p>Sir/Madam,</p>
-      <p>
-        This is an automated reminder. An <strong>EMERGENCY</strong> IP Whitelisting request
-        <strong>${ticketNo}</strong> for <strong>${entityName}</strong> is pending your action
-        and has exceeded the expected SLA.
-      </p>
-      <div style="background:#f8d7da;border-left:4px solid #dc3545;padding:12px;margin:16px 0;border-radius:4px">
-        <strong style="color:#dc3545">⚠ HIGH PRIORITY — EMERGENCY</strong><br/>
-        <strong>Pending Stage:</strong> ${currentRole}<br/>
-        <strong>Time Pending:</strong> ${hoursPending} hour${hoursPending !== 1 ? "s" : ""}
-      </div>
-      <p>
-        Please log into the
-        <a href="${process.env.NEXT_PUBLIC_DEV_API_URL ?? "#"}">WBES Administration Portal</a>
-        <strong>immediately</strong> to process this request.
-      </p>
-      <br/>
-      <p>धन्यवाद एवं आभार / Thanks and Regards,<br/>
-      <strong>WBES Automated System</strong><br/>
-      Grid Controller of India Limited</p>
-    </div>`;
+<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.8;max-width:600px;">
+
+  <p>Sir/Madam,</p>
+
+  <p>
+    This is an automated reminder. An <strong>Emergency</strong> IP Whitelisting request for
+    <strong>${entityName}</strong> (Ticket No: <strong>${ticketNo}</strong>) is currently
+    pending at the <strong>${currentRole}</strong> stage and has exceeded the expected SLA.
+  </p>
+
+  <table style="border-collapse:collapse;width:100%;margin:16px 0;">
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;width:35%;">Ticket No.</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">${ticketNo}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Entity / Beneficiary</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">${entityName}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Pending Stage</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;color:#f06548;font-weight:bold;">${currentRole}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Time Pending</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;color:#f06548;font-weight:bold;">${hoursPending} hour${hoursPending !== 1 ? "s" : ""}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Priority</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;color:#f06548;font-weight:bold;">EMERGENCY</td>
+    </tr>
+  </table>
+
+  <p>
+    Please log into the <a href="${PORTAL_URL}">WBES Administration Portal</a>
+    <strong>immediately</strong> to process this request.
+  </p>
+
+  <br/>
+  <p>
+    धन्यवाद एवं आभार / Thanks and Regards,<br/>
+    <strong>WBES Automated System</strong><br/>
+    Grid Controller of India Limited
+  </p>
+
+</div>`;
 }
 
 // ── Public send helpers ───────────────────────────────────────────────────────
-export async function sendWorkflowEmail(
+
+function buildWorkflowMailPayload(
   ticketNo: string,
   entityName: string,
   action: string,
@@ -215,12 +270,10 @@ export async function sendWorkflowEmail(
   remarks: string,
   initiatorRole: string,
   initiatorRegion: string
-): Promise<void> {
-  const isRejected = action.toUpperCase().includes("REJECT");
-  const isCompleted =
-    actorRole.toUpperCase() === "IT" || actorRole.toUpperCase() === "ADMIN";
-  const isSubmission =
-    actorRole.toUpperCase().includes("LDC") && actorRole.toUpperCase() !== "NLDC";
+) {
+  const isRejected  = action.toUpperCase().includes("REJECT");
+  const isCompleted = actorRole.toUpperCase() === "IT" || actorRole.toUpperCase() === "ADMIN";
+  const isSubmission = actorRole.toUpperCase().includes("LDC") && actorRole.toUpperCase() !== "NLDC";
 
   const actionText = isRejected
     ? "Rejected"
@@ -231,25 +284,53 @@ export async function sendWorkflowEmail(
     : "Approved & Forwarded";
 
   const actionColor = isRejected ? "#f06548" : "#0ab39c";
-
   const { to, cc } = getEmailRouting(actorRole, action, initiatorRole, initiatorRegion);
 
-  if (!to && !cc) return;
+  if (!to && !cc) return null;
 
-  const subject = `WBES IP Whitelisting – Ticket ${ticketNo} – ${actionText} by ${actorRole}`;
+  return {
+    from:    smtpConfig.from,
+    to:      to || smtpConfig.ccAlways,
+    cc:      cc || undefined,
+    subject: `WBES IP Whitelisting – Ticket ${ticketNo} – ${actionText} by ${actorRole}`,
+    html:    workflowEmailTemplate(ticketNo, entityName, actionText, actionColor, actorRole, remarks),
+  };
+}
+
+export async function sendWorkflowEmail(
+  ticketNo: string,
+  entityName: string,
+  action: string,
+  actorRole: string,
+  remarks: string,
+  initiatorRole: string,
+  initiatorRegion: string
+): Promise<void> {
+  const payload = buildWorkflowMailPayload(ticketNo, entityName, action, actorRole, remarks, initiatorRole, initiatorRegion);
+  if (!payload) return;
 
   try {
-    await getTransporter().sendMail({
-      from:    smtpConfig.from,
-      to:      to || smtpConfig.ccAlways,
-      cc:      cc || undefined,
-      subject,
-      html:    workflowEmailTemplate(ticketNo, entityName, actionText, actionColor, actorRole, remarks),
-    });
+    await getTransporter().sendMail(payload);
   } catch (err) {
     // Log but never throw — email failure must not break the workflow
     console.error("[MAIL] sendWorkflowEmail failed:", err);
   }
+}
+
+/** Same as sendWorkflowEmail but THROWS on SMTP failure (use only in resend/test routes). */
+export async function sendWorkflowEmailOrThrow(
+  ticketNo: string,
+  entityName: string,
+  action: string,
+  actorRole: string,
+  remarks: string,
+  initiatorRole: string,
+  initiatorRegion: string
+): Promise<void> {
+  const payload = buildWorkflowMailPayload(ticketNo, entityName, action, actorRole, remarks, initiatorRole, initiatorRegion);
+  if (!payload) throw new Error("No recipients resolved for this request — check region/role configuration.");
+
+  await getTransporter().sendMail(payload);
 }
 
 export async function sendAlertEmail(
@@ -337,52 +418,57 @@ export async function sendRevocationEmail(p: RevocationEmailParams): Promise<voi
       ? `[SECURITY ALERT] Manual IP Revocation – ${p.username}`
       : `[SECURITY ALERT] Manual IP Revocation (${p.revokedIps.length} IPs) – ${p.username}`;
 
-  const ipRows = p.revokedIps
-    .map(
-      (ip) =>
-        `<tr><td style="padding:8px;border:1px solid #ddd;color:#f06548;font-weight:bold">${ip}</td></tr>`
-    )
-    .join("");
+  const ipList = p.revokedIps.map((ip) => `<li style="padding:2px 0;">${ip}</li>`).join("");
 
   const html = `
-    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px">
-      <p>Sir/Madam,</p>
-      <p>
-        Active IP Address(es) have been
-        <strong><span style="color:#f06548">Manually Revoked</span></strong>
-        outside the standard workflow process.
-      </p>
-      <table style="border-collapse:collapse;width:100%;max-width:600px;margin:12px 0">
-        <tr>
-          <td style="padding:8px;border:1px solid #ddd;font-weight:bold;background:#f8f9fa;width:35%">Target Username</td>
-          <td style="padding:8px;border:1px solid #ddd">${p.username}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px;border:1px solid #ddd;font-weight:bold;background:#f8f9fa">Entity / Beneficiary</td>
-          <td style="padding:8px;border:1px solid #ddd">${p.entityName}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px;border:1px solid #ddd;font-weight:bold;background:#f8f9fa">Total IPs Revoked</td>
-          <td style="padding:8px;border:1px solid #ddd">${p.revokedIps.length}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px;border:1px solid #ddd;font-weight:bold;background:#f8f9fa">Action Performed By</td>
-          <td style="padding:8px;border:1px solid #ddd">${p.actorRole}${p.actorName ? ` (${p.actorName})` : ""}</td>
-        </tr>
-      </table>
-      <table style="border-collapse:collapse;width:100%;max-width:600px;margin:8px 0">
-        <tr>
-          <td style="padding:8px;border:1px solid #ddd;font-weight:bold;background:#f8f9fa">
-            Revoked IP Address(es)
-          </td>
-        </tr>
-        ${ipRows}
-      </table>
-      <br/>
-      <p>धन्यवाद एवं आभार / Thanks and Regards,<br/>
-      <strong>WBES Administration Portal</strong><br/>
-      Grid Controller of India Limited</p>
-    </div>`;
+<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.8;max-width:600px;">
+
+  <p>Sir/Madam,</p>
+
+  <p>
+    Please be informed that the following active IP address(es) for
+    <strong>${p.username}</strong> have been <strong style="color:#f06548;">Manually Revoked</strong>
+    outside the standard whitelisting workflow.
+  </p>
+
+  <table style="border-collapse:collapse;width:100%;margin:16px 0;">
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;width:35%;">Username</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">${p.username}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Entity / Beneficiary</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">${p.entityName}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Total IPs Revoked</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;color:#f06548;font-weight:bold;">${p.revokedIps.length}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Action Performed By</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">${p.actorRole}${p.actorName ? ` (${p.actorName})` : ""}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;background:#f5f5f5;font-weight:bold;">Revoked IP Address(es)</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">
+        <ul style="margin:0;padding-left:18px;">${ipList}</ul>
+      </td>
+    </tr>
+  </table>
+
+  <p>
+    Please log into the <a href="${PORTAL_URL}">WBES Administration Portal</a>
+    to review this action.
+  </p>
+
+  <br/>
+  <p>
+    धन्यवाद एवं आभार / Thanks and Regards,<br/>
+    <strong>WBES Administration Portal</strong><br/>
+    Grid Controller of India Limited
+  </p>
+
+</div>`;
 
   try {
     await getTransporter().sendMail({

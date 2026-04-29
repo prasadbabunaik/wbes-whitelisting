@@ -865,6 +865,45 @@ const CreateRequestForm = () => {
                             </FormGroup>
                           </Col>
 
+                          {validation.values.category === "EXISTING_USER" &&
+                            validation.values.username && (
+                              <Col md={12} className="mb-3">
+                                <div className="bg-soft-success border border-success border-opacity-25 p-3 rounded">
+                                  <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 className="text-success fw-bold fs-13 mb-0">
+                                      <i className="ri-shield-check-line me-1"></i>
+                                      Currently Whitelisted IPs ({getActiveIpsOptions().length})
+                                    </h6>
+                                    {getActiveIpsOptions().length > 0 && (
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-soft-success py-0 px-2"
+                                        onClick={() =>
+                                          handleCopy(
+                                            getActiveIpsOptions().map((o) => o.value).join(", "),
+                                            "Current IPs copied!"
+                                          )
+                                        }
+                                      >
+                                        <i className="ri-file-copy-line align-bottom me-1"></i> Copy All
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="d-flex flex-wrap gap-1">
+                                    {getActiveIpsOptions().length > 0 ? (
+                                      getActiveIpsOptions().map((ip, i) => (
+                                        <Badge color="success" className="fw-normal" key={i}>
+                                          {ip.value}
+                                        </Badge>
+                                      ))
+                                    ) : (
+                                      <span className="text-muted small fst-italic">No IPs currently whitelisted</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </Col>
+                            )}
+
                           <Col md={12}>
                             <FormGroup className="bg-light p-3 rounded border border-dashed mb-4">
                               <div className="d-flex justify-content-between align-items-center mb-2">
@@ -892,23 +931,14 @@ const CreateRequestForm = () => {
 
                                   {validation.values.category === "EXISTING_USER" &&
                                     validation.values.username && (
-                                      <>
-                                        <span className="text-muted small fw-medium border-start ps-3">
-                                          <Badge color="soft-success" className="text-success me-1 px-2 border border-success border-opacity-25">
-                                            {validation.values.totalIps}
-                                          </Badge>
-                                          Currently Whitelisted
-                                        </span>
-
-                                        <span
-                                          className="text-primary small fw-medium"
-                                          style={{ cursor: "pointer", textDecoration: "underline" }}
-                                          onClick={handleViewHistory}
-                                        >
-                                          <i className="ri-history-line align-bottom me-1"></i>
-                                          View Recent History
-                                        </span>
-                                      </>
+                                      <span
+                                        className="text-primary small fw-medium border-start ps-3"
+                                        style={{ cursor: "pointer", textDecoration: "underline" }}
+                                        onClick={handleViewHistory}
+                                      >
+                                        <i className="ri-history-line align-bottom me-1"></i>
+                                        View Recent History
+                                      </span>
                                     )}
                                 </div>
                               </div>

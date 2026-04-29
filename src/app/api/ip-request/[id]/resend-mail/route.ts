@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db/client";
 import { validateSecureSession } from "src/lib/auth";
-import { sendWorkflowEmail } from "src/lib/mailer";
+import { sendWorkflowEmailOrThrow } from "src/lib/mailer";
 
 export async function POST(
   req: NextRequest,
@@ -38,8 +38,8 @@ export async function POST(
       finalRegion = entity?.region ?? request.submittedByRole ?? "UNKNOWN";
     }
 
-    // Resend using the current state of the request
-    await sendWorkflowEmail(
+    // Resend using the current state of the request — throws on SMTP failure
+    await sendWorkflowEmailOrThrow(
       request.ticketNo,
       request.entityName,
       "APPROVE",                          // treated as a forwarding/reminder
@@ -55,6 +55,6 @@ export async function POST(
     const msg = error.message ?? "";
     if (msg.includes("Unauthorized")) return NextResponse.json({ error: msg }, { status: 401 });
     if (msg.includes("Forbidden"))    return NextResponse.json({ error: msg }, { status: 403 });
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: `Mail failed: ${msg}` }, { status: 500 });
   }
 }

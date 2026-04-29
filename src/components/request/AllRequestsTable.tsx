@@ -518,11 +518,21 @@ const AllRequestsTable = ({
         accessorKey: "currentRole",
         enableSorting: true,
         enableColumnFilter: false,
-        cell: (cell: any) => (
-          <Badge color="light" className="text-dark border">
-            {cell.getValue()}
-          </Badge>
-        ),
+        cell: (cell: any) => {
+          const status = cell.row.original.status;
+          if (status === "COMPLETED" || status === "REJECTED") {
+            return (
+              <Badge color={status === "COMPLETED" ? "success" : "danger"} className="bg-opacity-10 border text-uppercase" style={{ color: status === "COMPLETED" ? "#0ab39c" : "#f06548" }}>
+                {status === "COMPLETED" ? "Done" : "Closed"}
+              </Badge>
+            );
+          }
+          return (
+            <Badge color="light" className="text-dark border">
+              {cell.getValue()}
+            </Badge>
+          );
+        },
       },
       {
         header: "Actions",
@@ -733,6 +743,7 @@ const AllRequestsTable = ({
 
   return (
     <React.Fragment>
+      <ToastContainer theme="colored" position="top-right" autoClose={3000} hideProgressBar={true} />
       <div className="page-content">
         <Container fluid>
           <BreadCrumb title={pageTitle} pageTitle="Approval Workflow" />
